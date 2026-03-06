@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "repo": "Bindkushal/The-Child",
+    "branch": "master",
+    "last_updated": "1970-01-01T00:00:00Z",
+    "ewc_lambda": 400,
+    "prune_threshold": 0.001,
+    "task_id": 0
+  },
+  "current": {
+    "epoch": 0,
+    "total_epochs": 0,
+    "progress_pct": 0.0,
+    "train_loss": 0.0,
+    "val_loss": 0.0,
+    "train_acc": 0.0,
+    "val_acc": 0.0,
+    "ewc_loss": 0.0,
+    "timestamp": "1970-01-01T00:00:00Z"
+  },
+  "network": {
+    "total_params": 0,
+    "active_params": 0,
+    "pruned_params": 0,
+    "prune_ratio": 0.0,
+    "layers": []
+  },
+  "history": [],
+  "extra": {}
+}
