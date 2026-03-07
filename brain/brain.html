@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🧠 SENN BRAIN</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #020915;
+  --bg2:     #040f20;
+  --bg3:     #071526;
+  --border:  #0d2038;
+  --cyan:    #00e5ff;
+  --green:   #39ff14;
+  --red:     #ff2255;
+  --amber:   #ffcc00;
+  --purple:  #bb55ff;
+  --text:    #b8ccd8;
+  --dim:     #2a4055;
+  --muted:   #112030;
+  --font:    'Courier New', 'Consolas', monospace;
+}
+
+html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:var(--font); }
+
+/* ─── HEADER ─────────────────────────────────────────── */
+#header {
+  height: 52px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 14px;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.logo      { font-size:17px; font-weight:900; color:var(--cyan); letter-spacing:4px; text-shadow:0 0 18px rgba(0,229,255,.45); }
+.logo-sub  { font-size:8px; color:var(--dim); letter-spacing:3px; margin-top:1px; }
+.vline     { width:1px; height:28px; background:var(--border); flex-shrink:0; }
+
+.metrics   { display:flex; gap:7px; margin-left:auto; align-items:center; }
+
+.metric {
+  display:flex; flex-direction:column; align-items:center;
+  background:rgba(0,18,40,.7); border:1px solid var(--border);
+  border-radius:4px; padding:3px 11px; min-width:66px;
+}
+.metric-label { font-size:7px; color:var(--dim); letter-spacing:2px; }
+.metric-value { font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.3; }
+
+#status-text { font-size:8px; letter-spacing:2px; color:var(--dim); }
+.dot { width:7px; height:7px; border-radius:50%; background:#152030; flex-shrink:0; transition:background .4s; }
+.dot.live  { background:var(--green);  box-shadow:0 0 8px var(--green);  animation:blink 2s ease-in-out infinite; }
+.dot.demo  { background:var(--amber);  box-shadow:0 0 8px var(--amber); }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ─── MAIN ────────────────────────────────────────────── */
+#main { display:flex; height:calc(100vh - 52px); overflow:hidden; }
+
+/* ─── NETWORK CANVAS ─────────────────────────────────── */
+#net-area { flex:1.8; position:relative; overflow:hidden; border-right:1px solid var(--border); }
+#net-canvas { display:block; width:100%; height:100%; }
+
+/* connecting overlay */
+#connecting {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px;
+  background:rgba(2,9,21,.92); transition:opacity .6s;
+}
+#connecting.gone { opacity:0; pointer-events:none; }
+.spin-ring {
+  width:38px; height:38px; border:2px solid var(--cyan);
+  border-top-color:transparent; border-radius:50%;
+  animation:spin 1s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+.conn-text  { font-size:10px; letter-spacing:3px; color:var(--dim); }
+.conn-sub   { font-size:8px;  letter-spacing:2px; color:var(--muted); }
+
+/* legend */
+#legend {
+  position:absolute; bottom:12px; left:12px;
+  display:flex; gap:10px; background:rgba(2,9,21,.88);
+  border:1px solid var(--border); border-radius:6px;
+  padding:6px 12px; backdrop-filter:blur(4px);
+}
+.leg { display:flex; align-items:center; gap:5px; font-size:8px; color:var(--dim); letter-spacing:1px; }
+.leg-dot { width:8px; height:8px; border-radius:50%; }
+
+/* ─── RIGHT PANEL ────────────────────────────────────── */
+#panel { width:296px; flex-shrink:0; display:flex; flex-direction:column; background:var(--bg2); overflow:hidden; }
+
+.sec { border-bottom:1px solid var(--border); padding:10px 13px; }
+.sec-title { font-size:7px; letter-spacing:3px; color:var(--dim); margin-bottom:7px; text-transform:uppercase; }
+
+/* charts */
+#charts { padding:10px 13px; border-bottom:1px solid var(--border); }
+.chart-wrap { margin-bottom:9px; }
+.chart-label { font-size:7px; letter-spacing:2px; color:var(--dim); margin-bottom:3px; display:flex; justify-content:space-between; }
+.chart-canvas { display:block; width:100%; }
+
+/* layers */
+#layers { padding:10px 13px; border-bottom:1px solid var(--border); }
+.lrow { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+.lname  { color:var(--dim); width:34px; font-size:8px; letter-spacing:1px; flex-shrink:0; }
+.lbar-bg { flex:1; height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+.lbar    { height:100%; border-radius:3px; transition:width .4s ease; }
+.lcount  { color:var(--cyan); font-size:10px; width:22px; text-align:right; font-variant-numeric:tabular-nums; flex-shrink:0; }
+.lnes    { font-size:7px; width:46px; text-align:right; letter-spacing:.3px; flex-shrink:0; }
+
+/* event log */
+#log-area { flex:1; padding:10px 13px; display:flex; flex-direction:column; overflow:hidden; min-height:0; }
+#log-scroll { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:3px; }
+#log-scroll::-webkit-scrollbar { width:2px; }
+#log-scroll::-webkit-scrollbar-thumb { background:var(--border); }
+
+.entry { font-size:8.5px; padding:3px 6px; border-radius:3px; border-left:2px solid transparent; line-height:1.5; animation:fadeIn .25s ease; }
+.entry.grow  { background:rgba(57,255,20,.05);  border-left-color:var(--green);  color:#80ff60; }
+.entry.prune { background:rgba(255,34,85,.05);  border-left-color:var(--red);    color:#ff8090; }
+.entry.task  { background:rgba(187,85,255,.05); border-left-color:var(--purple); color:#cc88ff; }
+.entry.info  { background:rgba(0,229,255,.03);  border-left-color:var(--dim);    color:var(--dim); }
+.estep { color:var(--muted); margin-right:4px; }
+
+@keyframes fadeIn { from{opacity:0;transform:translateX(-5px)} to{opacity:1;transform:none} }
+
+/* complete overlay */
+#complete {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px;
+  background:rgba(2,9,21,.93); opacity:0; pointer-events:none; transition:opacity .8s;
+}
+#complete.show { opacity:1; pointer-events:all; }
+.complete-title { font-size:18px; font-weight:900; color:var(--green); letter-spacing:6px; text-shadow:0 0 30px rgba(57,255,20,.6); }
+.complete-sub   { font-size:9px; color:var(--dim); letter-spacing:3px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div>
+    <div class="logo">⬡ SENN BRAIN</div>
+    <div class="logo-sub">SELF-EXPANDING NEURAL NETWORK — LIVE MONITOR</div>
+  </div>
+  <div class="vline"></div>
+  <div id="status-text">CONNECTING</div>
+  <div class="dot" id="dot"></div>
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">STEP</div>  <div class="metric-value" id="m-step"   style="color:var(--cyan)">—</div></div>
+    <div class="metric"><div class="metric-label">TASK</div>  <div class="metric-value" id="m-task"   style="color:var(--purple)">—</div></div>
+    <div class="metric"><div class="metric-label">LOSS</div>  <div class="metric-value" id="m-loss"   style="color:var(--red)">—</div></div>
+    <div class="metric"><div class="metric-label">EWC</div>   <div class="metric-value" id="m-ewc"    style="color:#ff8844">—</div></div>
+    <div class="metric"><div class="metric-label">ACC</div>   <div class="metric-value" id="m-acc"    style="color:var(--green)">—</div></div>
+    <div class="metric"><div class="metric-label">PARAMS</div><div class="metric-value" id="m-params" style="color:var(--amber)">—</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="net-area">
+    <canvas id="net-canvas"></canvas>
+
+    <div id="legend">
+      <div class="leg"><div class="leg-dot" style="background:#336688"></div>INPUT</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--cyan)"></div>HIDDEN</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>OUTPUT</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--green)"></div>GROWING</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>PRUNING</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--amber)"></div>SIGNAL</div>
+    </div>
+
+    <div id="connecting">
+      <div class="spin-ring"></div>
+      <div class="conn-text">WAITING FOR TRAINING SIGNAL</div>
+      <div class="conn-sub">DEMO MODE ACTIVE</div>
+    </div>
+
+    <div id="complete">
+      <div class="complete-title">TRAINING COMPLETE</div>
+      <div class="complete-sub" id="complete-sub"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="panel">
+    <!-- Charts -->
+    <div id="charts">
+      <div class="sec-title">METRICS</div>
+      <div class="chart-wrap">
+        <div class="chart-label"><span>LOSS</span><span id="lv" style="color:var(--red)">—</span></div>
+        <canvas class="chart-canvas" id="loss-c" height="58"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-label"><span>ACCURACY</span><span id="av" style="color:var(--green)">—</span></div>
+        <canvas class="chart-canvas" id="acc-c" height="46"></canvas>
+      </div>
+      <div class="chart-wrap" style="margin-bottom:0">
+        <div class="chart-label"><span>PARAM COUNT</span><span id="pv" style="color:var(--amber)">—</span></div>
+        <canvas class="chart-canvas" id="par-c" height="30"></canvas>
+      </div>
+    </div>
+
+    <!-- Architecture -->
+    <div id="layers">
+      <div class="sec-title">ARCHITECTURE</div>
+      <div id="llist"></div>
+    </div>
+
+    <!-- Event Log -->
+    <div id="log-area">
+      <div class="sec-title">EVENT LOG</div>
+      <div id="log-scroll"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  GLOBAL STATE
+// ═══════════════════════════════════════════════════
+const S = {
+  connected: false,
+  current: { step:0, task_id:1, n_tasks:3, loss:1.8, ewc_loss:0, acc:0.2, running:true },
+  network:  { input_size:20, output_size:5, total_params:525, layers:[
+    {id:0,type:'input', size:20,nes:0},
+    {id:1,type:'hidden',size:16,nes:0.1},
+    {id:2,type:'output',size:5, nes:0},
+  ]},
+  history: [],
+  recent_events: [],
+};
+
+// Per-layer neuron animation [{neuronIdx, state, ttl, maxTtl}]
+const ANIMS = {};
+// Signal particles [{fromLayer,fromIdx,toLayer,toIdx,progress,speed,color}]
+let SIGS = [];
+// Previous layer sizes to detect changes
+const PREV_SIZES = {};
+// Log entries
+const LOG = [];
+const SEEN_KEYS = new Set();
+let LAST_TASK = 0;
+let LAST_STEP_LOGGED = -1;
+
+// ═══════════════════════════════════════════════════
+//  DEMO SIMULATION (fallback)
+// ═══════════════════════════════════════════════════
+let _ds = 0, _dl = 1.8, _da = 0.2;
+let _dLayers = [
+  {id:0,type:'input', size:20,nes:0},
+  {id:1,type:'hidden',size:16,nes:0.12},
+  {id:2,type:'output',size:5, nes:0},
+];
+
+function simStep() {
+  _ds++;
+  _dl = Math.max(0.25, _dl - 0.0008 + (Math.random()-.5)*0.06);
+  _da = Math.min(0.96, _da + 0.0004 + Math.random()*0.003);
+
+  // Update NES per hidden layer
+  _dLayers = _dLayers.map((l,i) => ({
+    ...l,
+    nes: (i>0 && i<_dLayers.length-1)
+      ? Math.max(0, Math.min(0.4, (l.nes||0) + (Math.random()-.46)*0.025))
+      : 0
+  }));
+
+  const evs = [];
+
+  // Grow: every ~80 steps randomly
+  if (_ds % 80 === 0 && Math.random() < .72) {
+    const li = 1 + Math.floor(Math.random()*(_dLayers.length-2));
+    const n  = [2,4][Math.random()<.5?0:1];
+    _dLayers[li] = {..._dLayers[li], size: Math.min(48,_dLayers[li].size+n)};
+    evs.push({type:'grow',layer:li,count:n,step:_ds,trigger:'NES'});
+    trigAnim(li,'growing',n);
+  }
+
+  // Prune: every ~130 steps
+  if (_ds % 130 === 0 && Math.random() < .55) {
+    const li = 1 + Math.floor(Math.random()*(_dLayers.length-2));
+    if (_dLayers[li].size > 5) {
+      _dLayers[li] = {..._dLayers[li], size:_dLayers[li].size-1};
+      evs.push({type:'prune',layer:li,count:1,step:_ds,trigger:'threshold'});
+      trigAnim(li,'pruning',1);
+    }
+  }
+
+  // Depth growth: every ~300 steps
+  if (_ds % 300 === 0 && _dLayers.length < 5) {
+    const sz = 8;
+    const newLayer = {id:_dLayers.length-1,type:'hidden',size:sz,nes:0.08};
+    _dLayers.splice(_dLayers.length-1,0,newLayer);
+    _dLayers.forEach((l,i)=>l.id=i);
+    evs.push({type:'grow',layer:_dLayers.length-2,count:sz,step:_ds,trigger:'depth'});
+  }
+
+  const params = _dLayers.reduce((s,l,i)=>i===0?s:s+_dLayers[i-1].size*l.size+l.size,0);
+
+  S.current = {step:_ds,task_id:Math.min(3,Math.floor(_ds/300)+1),n_tasks:3,
+               loss:_dl,ewc_loss:_dl*.015,acc:_da,running:true};
+  S.network  = {input_size:20,output_size:5,total_params:params,layers:_dLayers};
+  const h = {step:_ds,loss:_dl,ewc:_dl*.015,acc:_da,params};
+  S.history  = [...S.history.slice(-199),h];
+  S.recent_events = evs;
+  return evs;
+}
+
+// ═══════════════════════════════════════════════════
+//  NEURON ANIMATIONS
+// ═══════════════════════════════════════════════════
+function trigAnim(li, st, count) {
+  if (!ANIMS[li]) ANIMS[li] = [];
+  const layer = S.network.layers[li];
+  const sz    = layer ? layer.size : 20;
+  for (let i=0; i<count; i++) {
+    ANIMS[li].push({
+      neuronIdx: Math.max(0,sz-count+i),
+      state: st, ttl:90, maxTtl:90
+    });
+  }
+}
+
+function tickAnims() {
+  Object.keys(ANIMS).forEach(li => {
+    ANIMS[li] = ANIMS[li].map(a=>({...a,ttl:a.ttl-1})).filter(a=>a.ttl>0);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  SIGNAL PARTICLES
+// ═══════════════════════════════════════════════════
+function tickSigs() {
+  const lyrs = S.network.layers||[];
+  if (lyrs.length < 2) return;
+
+  if (Math.random() < .38) {
+    const li = Math.floor(Math.random()*(lyrs.length-1));
+    SIGS.push({
+      fromLayer:li, fromIdx:Math.floor(Math.random()*lyrs[li].size),
+      toLayer:li+1, toIdx:Math.floor(Math.random()*lyrs[li+1].size),
+      progress:0,
+      speed:0.014+Math.random()*.014,
+      color: Math.random()<.12 ? '#ffcc00' : '#00e5ff'
+    });
+  }
+  SIGS = SIGS.map(s=>({...s,progress:s.progress+s.speed})).filter(s=>s.progress<1);
+}
+
+// ═══════════════════════════════════════════════════
+//  API POLLING
+// ═══════════════════════════════════════════════════
+async function poll() {
+  try {
+    const r = await fetch('/api/state',{cache:'no-store'});
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    if (!d.current || d.current.step===0) throw 0;
+
+    // Detect arch changes
+    (d.network?.layers||[]).forEach(l=>{
+      const prev = PREV_SIZES[l.id];
+      if (prev!==undefined && l.size>prev) trigAnim(l.id,'growing',l.size-prev);
+      if (prev!==undefined && l.size<prev) trigAnim(l.id,'pruning',prev-l.size);
+      PREV_SIZES[l.id] = l.size;
+    });
+
+    if (d.history?.length>0) S.history = d.history;
+    S.current       = d.current;
+    S.network       = d.network;
+    S.recent_events = d.recent_events||[];
+
+    if (!S.connected) {
+      S.connected = true;
+      document.getElementById('connecting').classList.add('gone');
+      document.getElementById('dot').className='dot live';
+      document.getElementById('status-text').textContent='LIVE';
+      addLog(0,'Connected to live training process','info');
+    }
+
+    // Training finished?
+    if (d.current.running===false) {
+      const el = document.getElementById('complete');
+      el.classList.add('show');
+      document.getElementById('complete-sub').textContent=
+        `FINAL PARAMS: ${d.network.total_params?.toLocaleString()} | STEPS: ${d.current.step}`;
+    }
+
+    return (d.recent_events||[]).filter(e=>e.step>=(S.current.step-3));
+
+  } catch(_) {
+    if (S.connected) {
+      S.connected = false;
+      document.getElementById('dot').className='dot demo';
+      document.getElementById('status-text').textContent='DEMO';
+    }
+    return simStep();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  EVENT LOG
+// ═══════════════════════════════════════════════════
+function addLog(step, text, type) {
+  const k = `${type}|${step}|${text}`;
+  if (SEEN_KEYS.has(k)) return;
+  SEEN_KEYS.add(k);
+  LOG.unshift({step,text,type});
+  if (LOG.length>60) LOG.pop();
+  renderLog();
+}
+
+function renderLog() {
+  document.getElementById('log-scroll').innerHTML =
+    LOG.slice(0,40).map(e=>`
+      <div class="entry ${e.type}">
+        <span class="estep">[${e.step}]</span>${e.text}
+      </div>`).join('');
+}
+
+function processEvs(evs) {
+  evs.forEach(e=>{
+    if (e.type==='grow')
+      addLog(e.step,`↑ L${e.layer}: +${e.count} neuron${e.count>1?'s':''} (${e.trigger||'NES'})`, 'grow');
+    else if (e.type==='prune')
+      addLog(e.step,`↓ L${e.layer}: pruned ${e.count} neuron${e.count>1?'s':''}`, 'prune');
+  });
+  const t = S.current?.task_id;
+  if (t && t!==LAST_TASK) {
+    LAST_TASK = t;
+    if (t>1) addLog(S.current.step,`▶ Task ${t}/${S.current.n_tasks} started`,'task');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  UI UPDATE
+// ═══════════════════════════════════════════════════
+function updMetrics() {
+  const c=S.current, n=S.network;
+  setText('m-step',  c.step||'—');
+  setText('m-task',  c.task_id?`${c.task_id}/${c.n_tasks}`:'—');
+  setText('m-loss',  c.loss!=null?c.loss.toFixed(4):'—');
+  setText('m-ewc',   c.ewc_loss!=null?c.ewc_loss.toFixed(4):'—');
+  setText('m-acc',   c.acc!=null?`${(c.acc*100).toFixed(1)}%`:'—');
+  setText('m-params',n?.total_params?n.total_params.toLocaleString():'—');
+  setText('lv', c.loss!=null?c.loss.toFixed(4):'—');
+  setText('av', c.acc!=null?`${(c.acc*100).toFixed(1)}%`:'—');
+  setText('pv', n?.total_params?n.total_params.toLocaleString():'—');
+}
+
+function setText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
+
+function updLayers() {
+  const lyrs = S.network?.layers||[];
+  const maxSz = Math.max(...lyrs.map(l=>l.size),20);
+  document.getElementById('llist').innerHTML = lyrs.map((l,i)=>{
+    const pct = (l.size/maxSz*100).toFixed(1);
+    const col = l.type==='input'?'#336688':l.type==='output'?'var(--purple)':'var(--cyan)';
+    const label = l.type==='input'?'IN':l.type==='output'?'OUT':`H${i}`;
+    const nesStr= l.nes>0?`NES ${l.nes.toFixed(3)}`:'';
+    const nesCol= l.nes>0.15?'var(--amber)':'var(--dim)';
+    return `<div class="lrow">
+      <div class="lname">${label}</div>
+      <div class="lbar-bg"><div class="lbar" style="width:${pct}%;background:${col}"></div></div>
+      <div class="lcount">${l.size}</div>
+      <div class="lnes" style="color:${nesCol}">${nesStr}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  CHART DRAWING
+// ═══════════════════════════════════════════════════
+function drawChart(id, data, color, lo, hi) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth || 270;
+  const ctx = canvas.getContext('2d');
+  const w=canvas.width, h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+  if (data.length < 2) return;
+
+  const pts = data.slice(-160);
+  const mn  = lo!=null?lo:Math.min(...pts)*0.9;
+  const mx  = hi!=null?hi:Math.max(...pts)*1.08;
+  const rng = mx-mn||1;
+
+  // Grid
+  ctx.strokeStyle='#071526'; ctx.lineWidth=1;
+  for(let i=0;i<4;i++){const y=(i/3)*h;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+
+  const xOf = i => (i/(pts.length-1))*w;
+  const yOf = v => h - ((v-mn)/rng)*h*.88 - h*.06;
+
+  // Fill
+  const grd = ctx.createLinearGradient(0,0,0,h);
+  grd.addColorStop(0, color+'44'); grd.addColorStop(1, color+'00');
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.moveTo(xOf(0),h);
+  pts.forEach((v,i) => ctx.lineTo(xOf(i),yOf(v)));
+  ctx.lineTo(xOf(pts.length-1),h);
+  ctx.closePath(); ctx.fill();
+
+  // Line
+  ctx.strokeStyle=color; ctx.lineWidth=1.5;
+  ctx.shadowColor=color; ctx.shadowBlur=5;
+  ctx.beginPath();
+  pts.forEach((v,i)=>i===0?ctx.moveTo(xOf(0),yOf(v)):ctx.lineTo(xOf(i),yOf(v)));
+  ctx.stroke(); ctx.shadowBlur=0;
+}
+
+function updCharts() {
+  const h = S.history;
+  if (h.length<2) return;
+  drawChart('loss-c', h.map(x=>x.loss), '#ff2255', 0, null);
+  drawChart('acc-c',  h.map(x=>x.acc),  '#39ff14', 0, 1);
+  drawChart('par-c',  h.map(x=>x.params),'#ffcc00', 0, null);
+}
+
+// ═══════════════════════════════════════════════════
+//  NETWORK CANVAS
+// ═══════════════════════════════════════════════════
+const NC  = document.getElementById('net-canvas');
+const CTX = NC.getContext('2d');
+
+function resizeNC() {
+  const a=document.getElementById('net-area');
+  NC.width=a.clientWidth; NC.height=a.clientHeight;
+}
+window.addEventListener('resize',resizeNC);
+resizeNC();
+
+function layoutNet(lyrs, w, h) {
+  const PX=72, PY=52;
+  const lx = lyrs.map((_,i)=> lyrs.length===1 ? w/2 : PX + (i/(lyrs.length-1))*(w-PX*2));
+  const pos = lyrs.map((l,li) => {
+    const vis = Math.min(l.size, 36);
+    const spc = Math.min(26, (h-PY*2)/Math.max(vis-1,1));
+    const topY = h/2 - spc*(vis-1)/2;
+    return Array.from({length:vis},(_,ni)=>({
+      li, ni, x:lx[li], y:topY+ni*spc,
+      truncated: vis<l.size && ni===vis-1,
+      actualSize: l.size
+    }));
+  });
+  return {lx,pos};
+}
+
+function drawNet(w,h) {
+  const lyrs = S.network?.layers||[];
+  if (!lyrs.length) return;
+  const {lx,pos} = layoutNet(lyrs,w,h);
+
+  // Scan line shimmer
+  const scanY = (Date.now()*.025)%h;
+  const sg = CTX.createLinearGradient(0,scanY-50,0,scanY+50);
+  sg.addColorStop(0,'rgba(0,229,255,0)');
+  sg.addColorStop(.5,'rgba(0,229,255,.018)');
+  sg.addColorStop(1,'rgba(0,229,255,0)');
+  CTX.fillStyle=sg; CTX.fillRect(0,scanY-50,w,100);
+
+  // Connections (sampled)
+  CTX.lineWidth=.35;
+  pos.slice(0,-1).forEach((sl,li) => {
+    const dl = pos[li+1];
+    sl.slice(0,18).forEach(src => {
+      dl.slice(0,18).forEach(dst => {
+        CTX.strokeStyle='rgba(13,32,56,.65)';
+        CTX.beginPath(); CTX.moveTo(src.x,src.y); CTX.lineTo(dst.x,dst.y); CTX.stroke();
+      });
+    });
+  });
+
+  // Signal particles
+  SIGS.forEach(sig=>{
+    const sl=pos[sig.fromLayer], dl=pos[sig.toLayer];
+    if(!sl||!dl) return;
+    const si=Math.min(sig.fromIdx,sl.length-1);
+    const di=Math.min(sig.toIdx,  dl.length-1);
+    const s=sl[si], d=dl[di];
+    if(!s||!d) return;
+    const p=sig.progress;
+    const x=s.x+(d.x-s.x)*p, y=s.y+(d.y-s.y)*p;
+    const a=1-p*.5;
+    // Trail
+    const tp=Math.max(0,p-.08);
+    const tx=s.x+(d.x-s.x)*tp, ty=s.y+(d.y-s.y)*tp;
+    CTX.strokeStyle=sig.color+(Math.floor(a*100).toString(16).padStart(2,'0'));
+    CTX.lineWidth=.9;
+    CTX.beginPath(); CTX.moveTo(tx,ty); CTX.lineTo(x,y); CTX.stroke();
+    CTX.shadowColor=sig.color; CTX.shadowBlur=7;
+    CTX.fillStyle=sig.color;
+    CTX.beginPath(); CTX.arc(x,y,2.2,0,Math.PI*2); CTX.fill();
+    CTX.shadowBlur=0;
+  });
+
+  // Neurons
+  pos.forEach((lneurons,li)=>{
+    const lyr = lyrs[li];
+    const anims = ANIMS[li]||[];
+
+    lneurons.forEach(n=>{
+      if (n.truncated) {
+        CTX.fillStyle='rgba(0,229,255,.3)';
+        CTX.font='11px Courier New';
+        CTX.textAlign='center';
+        CTX.fillText('···',n.x,n.y+4);
+        return;
+      }
+
+      // Find any anim for this neuron idx
+      const anim = anims.find(a=>a.neuronIdx===n.ni);
+      const t    = anim ? anim.ttl/anim.maxTtl : null;
+
+      let color='#00e5ff', glowC='rgba(0,229,255,.38)', r=7, alpha=1;
+      if (lyr.type==='input')  { color='#336688'; glowC='rgba(50,100,140,.3)'; r=4; }
+      if (lyr.type==='output') { color='#bb55ff'; glowC='rgba(187,85,255,.4)'; r=6; }
+
+      if (anim && t!==null) {
+        if (anim.state==='growing') {
+          color='#39ff14'; glowC=`rgba(57,255,20,${t*.8})`; r=r+(1-t)*7;
+        } else if (anim.state==='pruning') {
+          color='#ff2255'; glowC=`rgba(255,34,85,${t*.8})`; alpha=t; r=r*Math.max(.3,t);
+        }
+      }
+
+      CTX.globalAlpha = alpha;
+
+      // Outer ring
+      if (lyr.type==='hidden') {
+        CTX.strokeStyle=color+'28'; CTX.lineWidth=1;
+        CTX.beginPath(); CTX.arc(n.x,n.y,r+4,0,Math.PI*2); CTX.stroke();
+      }
+
+      // Grow pulse ring
+      if (anim?.state==='growing' && t!==null) {
+        const pr = r + (1-t)*18;
+        CTX.strokeStyle=`rgba(57,255,20,${t*.55})`;
+        CTX.lineWidth=1.5;
+        CTX.beginPath(); CTX.arc(n.x,n.y,pr,0,Math.PI*2); CTX.stroke();
+      }
+
+      // NES glow boost for active hidden layer
+      if (lyr.nes > 0.15) {
+        CTX.shadowColor='#ffcc00'; CTX.shadowBlur=14;
+      } else {
+        CTX.shadowColor=glowC; CTX.shadowBlur=anim?18:9;
+      }
+
+      const grd = CTX.createRadialGradient(n.x,n.y,0,n.x,n.y,r);
+      grd.addColorStop(0,color);
+      grd.addColorStop(1,color+'33');
+      CTX.fillStyle=grd;
+      CTX.beginPath(); CTX.arc(n.x,n.y,r,0,Math.PI*2); CTX.fill();
+      CTX.strokeStyle=color; CTX.lineWidth=1;
+      CTX.beginPath(); CTX.arc(n.x,n.y,r,0,Math.PI*2); CTX.stroke();
+      CTX.shadowBlur=0; CTX.globalAlpha=1;
+    });
+  });
+
+  // Layer labels + NES bars
+  const lcol = {input:'#336688', hidden:'#00e5ff', output:'#bb55ff'};
+  lx.forEach((x,li)=>{
+    const l=lyrs[li]; const col=lcol[l.type]||'#00e5ff';
+    const lbl=l.type==='input'?'INPUT':l.type==='output'?'OUTPUT':`HIDDEN ${li}`;
+    CTX.fillStyle=col; CTX.font='bold 8px Courier New'; CTX.textAlign='center';
+    CTX.fillText(lbl,x,20);
+    CTX.fillStyle=col+'99'; CTX.font='8px Courier New';
+    CTX.fillText(`n=${l.size}`,x,31);
+
+    if (l.nes>0) {
+      const nc = l.nes>.15?'#ffcc00':'#334455';
+      CTX.fillStyle=nc; CTX.font='7px Courier New';
+      CTX.fillText(`NES:${l.nes.toFixed(3)}`,x,h-18);
+      const bw=44, bh=3, bx=x-bw/2, by=h-12;
+      CTX.fillStyle='#071526'; CTX.fillRect(bx,by,bw,bh);
+      CTX.fillStyle=nc; CTX.fillRect(bx,by,bw*Math.min(1,l.nes/.3),bh);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  MAIN ANIMATION LOOP
+// ═══════════════════════════════════════════════════
+function frame() {
+  const w=NC.width, h=NC.height;
+  CTX.clearRect(0,0,w,h);
+
+  // Background
+  const bgr=CTX.createRadialGradient(w*.5,h*.5,0,w*.5,h*.5,Math.max(w,h)*.72);
+  bgr.addColorStop(0,'#041020'); bgr.addColorStop(1,'#020915');
+  CTX.fillStyle=bgr; CTX.fillRect(0,0,w,h);
+
+  // Grid
+  CTX.strokeStyle='#060e1c'; CTX.lineWidth=1;
+  for(let x=0;x<w;x+=44){CTX.beginPath();CTX.moveTo(x,0);CTX.lineTo(x,h);CTX.stroke();}
+  for(let y=0;y<h;y+=44){CTX.beginPath();CTX.moveTo(0,y);CTX.lineTo(w,y);CTX.stroke();}
+
+  tickAnims();
+  tickSigs();
+  drawNet(w,h);
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════════
+//  POLLING
+// ═══════════════════════════════════════════════════
+async function run() {
+  const evs = await poll();
+  updMetrics();
+  updLayers();
+  updCharts();
+  processEvs(evs);
+}
+
+requestAnimationFrame(frame);
+run();
+setInterval(run, 500);
+</script>
+</body>
+</html>

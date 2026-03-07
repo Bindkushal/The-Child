@@ -19,6 +19,83 @@ import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 import json
 import os
+from datetime import datetime
+
+# ── Live-state writer (feeds the SENN Brain visualizer) ──────────────────────
+LIVE_STATE_PATH = "live_state.json"
+_hist: list = []           # rolling history (max 200 entries)
+
+def write_live_state(net, controller, step, task_id, n_tasks,
+                     loss, ewc_penalty, acc, running=True):
+    global _hist
+
+    arch      = net.get_architecture()
+    nes_raw   = controller._compute_nes()
+
+    layers = [{"id": 0, "type": "input", "size": arch["input_size"], "nes": 0.0}]
+    for i, lyr in enumerate(arch["hidden_layers"]):
+        layers.append({
+            "id":   i + 1,
+            "type": "hidden",
+            "size": lyr["out"],
+            "nes":  round(float(nes_raw[i]) if i < len(nes_raw) else 0.0, 5)
+        })
+    layers.append({"id": len(layers), "type": "output",
+                   "size": arch["output_size"], "nes": 0.0})
+
+    ewc_val = float(ewc_penalty.item()
+                    if hasattr(ewc_penalty, "item") else ewc_penalty)
+
+    _hist.append({
+        "step":   step,
+        "loss":   round(float(loss), 5),
+        "ewc":    round(ewc_val, 5),
+        "acc":    round(float(acc), 4),
+        "params": arch["total_params"]
+    })
+    if len(_hist) > 200:
+        _hist = _hist[-200:]
+
+    recent_events = []
+    for e in controller.growth_events[-30:]:
+        recent_events.append({
+            "type":    e.get("type", "unknown"),
+            "layer":   e.get("layer", 0),
+            "count":   e.get("added", e.get("count", 1)),
+            "step":    step,
+            "trigger": e.get("trigger", "auto")
+        })
+
+    state = {
+        "meta": {
+            "ewc_lambda":      CONFIG["ewc_lambda"],
+            "prune_threshold": controller.prune_threshold
+        },
+        "current": {
+            "step":     step,
+            "task_id":  task_id,
+            "n_tasks":  n_tasks,
+            "loss":     round(float(loss), 5),
+            "ewc_loss": round(ewc_val, 5),
+            "acc":      round(float(acc), 4),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "running":  running
+        },
+        "network": {
+            "input_size":   arch["input_size"],
+            "output_size":  arch["output_size"],
+            "total_params": arch["total_params"],
+            "layers":       layers
+        },
+        "history":       _hist.copy(),
+        "recent_events": recent_events
+    }
+
+    try:
+        with open(LIVE_STATE_PATH, "w") as f:
+            json.dump(state, f)
+    except Exception as e:
+        print(f"  [Brain] Could not write live_state.json: {e}")
 
 from dynamic_net         import SelfExpandingNet
 from growth_controller   import GrowthController
@@ -179,6 +256,18 @@ def train():
                           f"Acc={acc:.2%} | Params={arch['total_params']:,}")
                     print(f"           Net: {net}")
 
+                    # ── Push to SENN Brain visualizer ──
+                    write_live_state(
+                        net, controller,
+                        step        = global_step,
+                        task_id     = task_id + 1,
+                        n_tasks     = CONFIG["n_tasks"],
+                        loss        = loss_val,
+                        ewc_penalty = ewc_penalty,
+                        acc         = acc,
+                        running     = True
+                    )
+
                 global_step  += 1
                 step_in_task += 1
 
@@ -212,6 +301,12 @@ def train():
     torch.save(net.state_dict(), "senn_final.pt")
     torch.save(net.get_architecture(), "architecture_final.json")
     print("✓ Model saved: senn_final.pt")
+
+    # ── Signal Brain visualizer that training is done ──
+    write_live_state(net, controller,
+        step=global_step, task_id=CONFIG["n_tasks"],
+        n_tasks=CONFIG["n_tasks"], loss=0.0,
+        ewc_penalty=0.0, acc=0.0, running=False)
 
     return net
 
@@ -258,7 +353,7 @@ if __name__ == "__main__":
     # Print setup guide for GitHub
     GitHubSelfModifier.print_setup_instructions(
         repo_path  = ".",
-        github_url = "https://github.com/YOUR_USERNAME/senn-child-ai"
+        github_url = "https://github.com/bindkushal/senn-child-ai"
     )
     
     trained_net = train()
