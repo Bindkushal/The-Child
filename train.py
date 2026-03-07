@@ -6,7 +6,7 @@ Master training loop — Self-Expanding Neural Network.
 What this does:
   - Task 1: Teaches the network to recognise handwritten letters A-Z
   - Task 2: Teaches handwritten digits 0-9 WITHOUT forgetting letters
-  - Network starts tiny (32 neurons) and grows itself as it struggles
+  - Network starts with 128 neurons and grows as large as needed
   - Every growth event is committed to GitHub automatically
   - Brain visualizer updates live while training runs
 
@@ -33,32 +33,27 @@ from data_loader          import get_letters_loader, get_digits_loader
 # ─────────────────────────────────────────────────────────────────────────
 CONFIG = {
     # Network shape
-    "input_size":      784,   # 28x28 pixels flattened
-    "output_size":     26,    # 26 letters A-Z
-    "initial_hidden":  [32],  # starts here, grows automatically
+    "input_size":      784,    # 28x28 pixels flattened
+    "output_size":     26,     # 26 letters A-Z
+    "initial_hidden":  [128],  # ← start bigger so neurons survive early training
 
     # Training
     "lr":              0.001,
     "batch_size":      64,
+    "steps_per_task":  3000,   # ← more steps = more time to learn and grow
 
-    # Steps per task
-    # 1 step = 1 batch of 64 images
-    # 2000 steps = ~128,000 images seen per task
-    "steps_per_task":  2000,
+    # Continual learning
+    "n_tasks":         1,      # letters only for now
 
-    # Start with letters only — set to 2 when ready to add digits
-    "n_tasks":         1,
-
-    # EWC memory strength
+    # EWC memory
     "ewc_lambda":      400.0,
 
-    # Growth threshold — lower = grows more often
-    # 0.08 is tuned for image data (original 0.15 was for random data)
-    "expansion_threshold": 0.08,
+    # Growth — how eagerly the network expands
+    "expansion_threshold": 0.03,   # ← low = grows often and early
 
     # GitHub
     "repo_path":  ".",
-    "auto_push":  False,
+    "auto_push":  False,       # set True in Colab after git config
 
     # Logging
     "log_every":  100,
@@ -75,7 +70,7 @@ TASKS = [
         "loader_fn":   lambda: get_letters_loader(batch_size=CONFIG["batch_size"]),
         "description": "Learning to read handwritten letters A through Z"
     },
-    # Uncomment when letters are working well:
+    # Uncomment Task 2 once letters reach >60% accuracy:
     # {
     #     "name":        "Digits 0-9",
     #     "loader_fn":   lambda: get_digits_loader(batch_size=CONFIG["batch_size"]),
@@ -110,14 +105,13 @@ def train():
     criterion = nn.CrossEntropyLoss()
 
     controller = GrowthController(
-    net                   = net,
-    expansion_threshold   = CONFIG["expansion_threshold"],
-    loss_plateau_patience = 100,
-    prune_threshold       = 0.0,    # pruning OFF — network too small to prune yet
-    neurons_to_add        = 16      # add more neurons per event
+        net                   = net,
+        expansion_threshold   = CONFIG["expansion_threshold"],
+        loss_plateau_patience = 150,   # wait longer before plateau trigger
+        prune_threshold       = 0.0,   # ← pruning OFF — let network grow freely
+        neurons_to_add        = 32,    # ← add 32 neurons per growth event (was 8)
+        max_neurons_per_layer = 1024,  # ← allow very large layers
     )
-
-    
 
     memory = EWCMemoryManager(net, ewc_lambda=CONFIG["ewc_lambda"])
 
@@ -141,10 +135,10 @@ def train():
     #  TASK LOOP
     # ─────────────────────────────────────────────────────────────────────
     for task_id, task in enumerate(TASKS):
-        print(f"\n{'═'*60}")
+        print(f"\n{'='*60}")
         print(f"  TASK {task_id+1}/{len(TASKS)}: {task['name']}")
         print(f"  {task['description']}")
-        print(f"{'═'*60}")
+        print(f"{'='*60}")
 
         print("\nLoading data...")
         train_loader, val_loader = task["loader_fn"]()
@@ -200,7 +194,7 @@ def train():
                             step         = global_step
                         )
 
-                # Live visualizer update
+                # Live visualizer
                 last_acc  = _quick_accuracy(net, x_batch, y_batch)
                 last_loss = loss_val
                 writer.update(
@@ -217,8 +211,8 @@ def train():
 
                 # Console log
                 if global_step % CONFIG["log_every"] == 0:
-                    val_acc   = _compute_accuracy(net, val_loader)
-                    arch      = net.get_architecture()
+                    val_acc = _compute_accuracy(net, val_loader)
+                    arch    = net.get_architecture()
                     log_entry = {
                         "step":        global_step,
                         "task":        task["name"],
@@ -231,7 +225,6 @@ def train():
                     }
                     training_log.append(log_entry)
 
-                    # Save best checkpoint
                     if val_acc > best_val_acc:
                         best_val_acc = val_acc
                         _save_checkpoint(net, arch, task["name"],
@@ -250,7 +243,7 @@ def train():
                 step_in_task += 1
 
         # End of task — consolidate memory
-        print(f"\n[Memory] Consolidating what was learned in '{task['name']}'...")
+        print(f"\n[Memory] Consolidating '{task['name']}'...")
         memory.after_task(
             dataloader = train_loader,
             criterion  = criterion,
@@ -263,9 +256,9 @@ def train():
     # ─────────────────────────────────────────────────────────────────────
     #  TRAINING COMPLETE
     # ─────────────────────────────────────────────────────────────────────
-    print("\n" + "═" * 60)
+    print("\n" + "=" * 60)
     print("  TRAINING COMPLETE")
-    print("═" * 60)
+    print("=" * 60)
 
     arch = net.get_architecture()
     print(f"\nFinal network    : {net}")
@@ -294,7 +287,7 @@ def train():
         json.dump(training_log, f, indent=2)
     print(f"✓ training_log.json saved")
 
-    # Mark visualizer complete
+    # Tell visualizer we are done
     writer.finish(
         step       = global_step,
         task_id    = len(TASKS),
@@ -314,7 +307,6 @@ def train():
 #  HELPERS
 # ─────────────────────────────────────────────────────────────────────────
 def _quick_accuracy(net, x_batch, y_batch) -> float:
-    """Accuracy on current batch — fast, used inside training loop."""
     net.eval()
     with torch.no_grad():
         preds   = net(x_batch).argmax(dim=1)
@@ -324,7 +316,6 @@ def _quick_accuracy(net, x_batch, y_batch) -> float:
 
 
 def _compute_accuracy(net, dataloader, max_batches: int = 10) -> float:
-    """Accuracy on validation set — used for logging."""
     net.eval()
     correct = total = 0
     with torch.no_grad():
@@ -339,7 +330,6 @@ def _compute_accuracy(net, dataloader, max_batches: int = 10) -> float:
 
 
 def _save_checkpoint(net, arch, task_name, step, val_acc):
-    """Save checkpoint when validation accuracy improves."""
     os.makedirs(CONFIG["save_dir"], exist_ok=True)
     safe_name = task_name.replace(" ", "_").replace("-", "").lower()
     path = os.path.join(CONFIG["save_dir"], f"best_{safe_name}.pt")
