@@ -110,12 +110,14 @@ def train():
     criterion = nn.CrossEntropyLoss()
 
     controller = GrowthController(
-        net                   = net,
-        expansion_threshold   = CONFIG["expansion_threshold"],
-        loss_plateau_patience = 100,
-        prune_threshold       = 0.002,
-        neurons_to_add        = 8
+    net                   = net,
+    expansion_threshold   = CONFIG["expansion_threshold"],
+    loss_plateau_patience = 100,
+    prune_threshold       = 0.0,    # pruning OFF — network too small to prune yet
+    neurons_to_add        = 16      # add more neurons per event
     )
+
+    
 
     memory = EWCMemoryManager(net, ewc_lambda=CONFIG["ewc_lambda"])
 
