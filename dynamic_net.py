@@ -113,12 +113,12 @@ class DynamicLayer(nn.Module):
         # New input connections: near zero
         new_weight[:, old_in:] = torch.randn(self.out_features, n) * 0.01
 
+        # ← save OLD bias BEFORE replacing the layer
+        old_bias = self.linear.bias.data.clone()
+
         self.linear = nn.Linear(new_in, self.out_features)
         self.linear.weight = nn.Parameter(new_weight)
-        self.linear.bias   = nn.Parameter(self.linear.bias.data.clone()
-                                          if hasattr(self.linear, 'bias') and
-                                          self.linear.bias is not None
-                                          else torch.zeros(self.out_features))
+        self.linear.bias   = nn.Parameter(old_bias)   # ← restore old bias
         self.in_features = new_in
         self._register_hooks()
 
